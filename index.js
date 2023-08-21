@@ -1,42 +1,37 @@
-const Strophe = require('strophe.js').Strophe;
-const $ = require('strophe.js').$;
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-// Datos de conexión
-const XMPP_SERVER = 'alumchat.xyz';
-const BARE_JID = 'nate@alumchat.xyz';
-const PASSWORD = 'barcaroly';
+const { client, xml } = require("@xmpp/client");
 
-
-const connection = new Strophe.Connection(`ws://${XMPP_SERVER}:5280/xmpp-websocket`);
-
-// Conexion
-const onConnect = (status) => {
-    if (status === Strophe.Status.CONNECTED) {
-        console.log('Conectado al servidor XMPP');
-
-        // Enviar un mensaje
-        const recipientJID = '1220@alumchat.xyz';
-        const messageText = '¡Hola desde mi cliente XMPP!';
-        sendMessage(recipientJID, messageText);
-    }
+// Datos de conexión al servidor XMPP
+const xmppOptions = {
+  service: "alumchat.xyz",
+  username: "natanael",
+  password: "barcaroly",
 };
 
-// Enviar mensaje
-const sendMessage = (to, messageBody) => {
-    const message = $msg({
-        to: to,
-        type: 'chat',
-    }).c('body').t(messageBody);
+// Crear una instancia del cliente XMPP
+const xmppClient = client({
+  service: xmppOptions.service,
+  username: xmppOptions.username,
+  password: xmppOptions.password,
+});
 
-    connection.send(message);
-};
+// Manejadores de eventos
+xmppClient.on("online", (jid) => {
+  console.log(`Conectado como ${jid.toString()}`);
+  const message = xml("message", { to: "natanael@alumchat.xyz", type: "chat" }, [
+    xml("body", {}, "¡Hola desde XMPP en JavaScript!"),
+  ]);
+  xmppClient.send(message);
+});
 
+xmppClient.on("error", (err) => {
+  console.error("Error:", err);
+});
 
-// Autenticacion
-connection.connect(BARE_JID, PASSWORD, onConnect);
+xmppClient.on("offline", () => {
+  console.log("Desconectado");
+});
 
-//Errores
-connection.addHandler((error) => {
-    console.error('Error de conexión:', error);
-    return true;
-}, null, 'error', null);
+// Iniciar la conexión
+xmppClient.start().catch((err) => console.error("Error al iniciar la conexión:", err));
