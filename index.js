@@ -36,6 +36,7 @@ async function createUser(newUsername, newPassword) {
 
     adminClient.stop();
     console.log("Usuario creado EXITOSAMENTE");
+    showUserOptions(xmppClient);
   });
 
   adminClient.on("error", (err) => {
@@ -98,22 +99,54 @@ function sendMessage(xmppClient) {
 }
 
 
+// Función para eliminar un usuario
+async function deleteCurrentUser(xmppClient) {
+  const iq = xml("iq", {
+    type: "set",
+    id: "del1",
+  });
+
+  iq.c("query", { xmlns: "jabber:iq:register" })
+    .c("remove");
+
+  try {
+    const response = await xmppClient.send(iq);
+    console.log(`Usuario ${xmppClient.jid.local} eliminado EXITOSAMENTE`);
+    xmppClient.stop(); 
+    rl.close();
+  } catch (err) {
+    console.error("Error al eliminar el usuario:", err);
+    rl.close();
+  }
+}
+
+
+
+
 // Mostrar opciones al usuario ya adentro
 function showUserOptions(xmppClient) {
-  rl.question("Seleccione una opción:\n1. Enviar mensaje\n2. Cerrar Sesión\n", (option) => {
-    if (option === "1") {
-      // Opción para enviar mensaje
-      sendMessage(xmppClient);
-    } else if (option === "2") {
-      // Opción para cerrar sesión y desconectar
-      xmppClient.stop();
-      rl.close();
-    } else {
-      console.log("Opción no válida.");
-      showUserOptions(xmppClient);
+  rl.question(
+    "Seleccione una opción:\n1. Enviar mensaje\n2. Eliminar mi cuenta\n3. Cerrar Sesión\n",
+    (option) => {
+      if (option === "1") {
+        // Opción para enviar mensaje
+        sendMessage(xmppClient);
+      } else if (option === "2") {
+        // Opción para eliminar mi cuenta
+        deleteCurrentUser(xmppClient);
+      } else if (option === "3") {
+        // Opción para cerrar sesión y desconectar
+        xmppClient.stop();
+        rl.close();
+      } else {
+        console.log("Opción no válida.");
+        showUserOptions(xmppClient);
+      }
     }
-  });
+  );
 }
+
+
 
 // Mostrar opciones iniciales al usuario
 function showInitialOptions() {
@@ -137,5 +170,5 @@ function showInitialOptions() {
   });
 }
 
-// Mostrar las opciones iniciales al usuario al inicio
+// Menu inicial
 showInitialOptions();
