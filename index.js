@@ -13,7 +13,7 @@ const xmppOptions = {
   service: "alumchat.xyz",
 };
 
-// Función para crear un usuario utilizando XEP-0077
+// Función para crear un usuario nuevo
 async function createUser(newUsername, newPassword) {
   const adminClient = client({
     service: xmppOptions.service,
@@ -22,7 +22,6 @@ async function createUser(newUsername, newPassword) {
   });
 
   adminClient.on("online", async () => {
-    console.log("Conectado al servidor XMPP como administrador");
 
     const iq = xml("iq", {
       type: "set",
@@ -36,7 +35,7 @@ async function createUser(newUsername, newPassword) {
     const response = await adminClient.send(iq);
 
     adminClient.stop();
-    rl.close();
+    console.log("Usuario creado EXITOSAMENTE");
   });
 
   adminClient.on("error", (err) => {
@@ -62,10 +61,10 @@ async function loginExistingUser(username, password) {
 
   xmppClient.on("online", (jid) => {
     console.log(`Conectado como ${jid.toString()}`);
-    const message = xml("message", { to: "natanael@alumchat.xyz", type: "chat" }, [
-      xml("body", {}, "¡Hola desde XMPP en JavaScript!")
-    ]);
-    xmppClient.send(message);
+
+    // Mostrar opciones al usuario
+    showUserOptions(xmppClient);
+
   });
 
   xmppClient.on("error", (err) => {
@@ -83,24 +82,60 @@ async function loginExistingUser(username, password) {
   }
 }
 
-// Solicitar la opción al usuario al inicio
-rl.question("¿Deseas crear un usuario nuevo o entrar con uno existente? (crear/existente): ", (choice) => {
-  if (choice === "crear") {
-    rl.question("Ingrese un nombre de usuario nuevo: ", (newUsername) => {
-      rl.question("Ingrese una contraseña para el nuevo usuario: ", (newPassword) => {
-        createUser(newUsername, newPassword);
-        rl.close();
-      });
+// Función para enviar un mensaje a una persona
+function sendMessage(xmppClient) {
+  rl.question("Ingrese el nombre de usuario del destinatario: ", (recipient) => {
+    rl.question("Ingrese el mensaje a enviar: ", (messageText) => {
+      const message = xml("message", { to: recipient + "@" + xmppOptions.service, type: "chat" }, [
+        xml("body", {}, messageText)
+      ]);
+      xmppClient.send(message);
+
+      // Volver a mostrar el menú después de enviar el mensaje
+      showUserOptions(xmppClient);
     });
-  } else if (choice === "existente") {
-    rl.question("Ingrese el nombre de usuario existente: ", (existingUsername) => {
-      rl.question("Ingrese la contraseña: ", (existingPassword) => {
-        loginExistingUser(existingUsername, existingPassword);
-        rl.close();
+  });
+}
+
+
+// Mostrar opciones al usuario ya adentro
+function showUserOptions(xmppClient) {
+  rl.question("Seleccione una opción:\n1. Enviar mensaje\n2. Cerrar Sesión\n", (option) => {
+    if (option === "1") {
+      // Opción para enviar mensaje
+      sendMessage(xmppClient);
+    } else if (option === "2") {
+      // Opción para cerrar sesión y desconectar
+      xmppClient.stop();
+      rl.close();
+    } else {
+      console.log("Opción no válida.");
+      showUserOptions(xmppClient);
+    }
+  });
+}
+
+// Mostrar opciones iniciales al usuario
+function showInitialOptions() {
+  rl.question("¿Deseas crear un usuario nuevo o entrar con uno existente? (crear/existente): ", (choice) => {
+    if (choice === "crear") {
+      rl.question("Ingrese un nombre de usuario nuevo: ", (newUsername) => {
+        rl.question("Ingrese una contraseña para el nuevo usuario: ", (newPassword) => {
+          createUser(newUsername, newPassword);
+        });
       });
-    });
-  } else {
-    console.log("Opción no válida. Por favor, elige 'crear' o 'existente'.");
-    rl.close();
-  }
-});
+    } else if (choice === "existente") {
+      rl.question("Ingrese el nombre de usuario existente: ", (existingUsername) => {
+        rl.question("Ingrese la contraseña: ", (existingPassword) => {
+          loginExistingUser(existingUsername, existingPassword);
+        });
+      });
+    } else {
+      console.log("Opción no válida. Por favor, elige 'crear' o 'existente'.");
+      showInitialOptions();
+    }
+  });
+}
+
+// Mostrar las opciones iniciales al usuario al inicio
+showInitialOptions();
