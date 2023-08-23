@@ -8,12 +8,12 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-// Datos de conexión al servidor XMPP
+// XMPP server connection options
 const xmppOptions = {
   service: "alumchat.xyz",
 };
 
-// Función para crear un usuario nuevo
+// Function to create a new user
 async function createUser(newUsername, newPassword) {
   const adminClient = client({
     service: xmppOptions.service,
@@ -52,7 +52,7 @@ async function createUser(newUsername, newPassword) {
   }
 }
 
-// Función para iniciar sesión con un usuario existente
+// Function to log in with an existing user
 async function loginExistingUser(username, password) {
   const xmppClient = client({
     service: xmppOptions.service,
@@ -63,7 +63,7 @@ async function loginExistingUser(username, password) {
   xmppClient.on("online", (jid) => {
     console.log(`Conectado como ${jid.toString()}`);
 
-    // Mostrar opciones al usuario
+    // Show options to the user
     showUserOptions(xmppClient);
 
   });
@@ -83,7 +83,7 @@ async function loginExistingUser(username, password) {
   }
 }
 
-// Función para enviar un mensaje a una persona
+// Function to send a message to a person
 function sendMessage(xmppClient) {
   rl.question("Ingrese el nombre de usuario del destinatario: ", (recipient) => {
     rl.question("Ingrese el mensaje a enviar: ", (messageText) => {
@@ -92,14 +92,14 @@ function sendMessage(xmppClient) {
       ]);
       xmppClient.send(message);
 
-      // Volver a mostrar el menú después de enviar el mensaje
+      // Show the menu again after sending the message
       showUserOptions(xmppClient);
     });
   });
 }
 
 
-// Función para eliminar un usuario
+// Function to delete a user
 async function deleteCurrentUser(xmppClient) {
   const iq = xml("iq", {
     type: "set",
@@ -121,21 +121,146 @@ async function deleteCurrentUser(xmppClient) {
 }
 
 
+// Function to create a chat with a user
+function createChat(xmppClient,password) {
+  rl.question("Ingrese el nombre de usuario con quien desea chatear: ", (recipient) => {
+    const chatJID = `${recipient}@${xmppOptions.service}`;
+
+    // Register the chat in the bookmarks of the current user
+    xmppClient.send(xml("iq", { type: "set", id: "bookmark1" }, [
+      xml("pubsub", { xmlns: "http://jabber.org/protocol/pubsub#owner" }, [
+        xml("configure", { node: "urn:xmpp:chat-markers:0" }, [
+          xml("x", { xmlns: "jabber:x:data", type: "submit" }, [
+            xml("field", { var: "FORM_TYPE", type: "hidden" }, [
+              xml("value", "http://jabber.org/protocol/pubsub#node_config")
+            ]),
+            xml("field", { var: "muc#roomconfig_enablearchiving", type: "boolean", value: "false" }),
+            xml("field", { var: "muc#roomconfig_enablelogging", type: "boolean", value: "false" }),
+            xml("field", { var: "FORM_TYPE", type: "hidden" }, [
+              xml("value", "http://jabber.org/protocol/pubsub#subscribe_authorization")
+            ]),
+          ])
+        ])
+      ])
+    ]));
 
 
-// Mostrar opciones al usuario ya adentro
+    console.log("Iniciando chat con", recipient);
+
+    const chatClient = client({
+      service: xmppOptions.service,
+      username: xmppClient.jid.local,
+      password: password,
+    });
+
+    chatClient.on("online", (jid) => {
+      console.log(`Chateando con ${recipient}`);
+      rl.prompt();
+    });
+
+    chatClient.on("stanza", (stanza) => {
+      console.log("Stanza recibida:", stanza.toString());
+      if (stanza.is("message")) {
+        console.log("Es un mensaje");
+        if (stanza.attrs.from === chatJID && stanza.getChildText("body")) {
+          console.log(`${recipient}: ${stanza.getChildText("body")}`);
+        }
+      }  
+    });
+
+    chatClient.on("error", (err) => {
+      console.error("Error en el chat:", err);
+    });
+
+    try {
+      chatClient.start().catch((err) => {
+        console.error("Error al iniciar el chat:", err);
+      });
+    } catch (err) {
+      console.error("Error al iniciar el chat:", err);
+    }
+
+    rl.prompt();
+
+    rl.on("line", (input) => {
+      if (input.toLowerCase() === "/salir") {
+        console.log("Saliendo del chat...");
+        chatClient.stop();
+      } else {
+        const message = xml("message", { to: chatJID, type: "chat" }, [
+          xml("body", {}, input),
+          xml("x", { xmlns: "jabber:x:event" }, [
+            xml("composing")
+          ])
+        ]);
+        chatClient.send(message);
+        rl.prompt();
+      }
+    });
+
+  });
+}
+
+// Function to get contacts 
+async function getContactsPresence(xmppClient) {
+  console.log("Obteniendo Contactos...");
+
+  try {
+    // Request the roster of contacts
+    const rosterIQ = xml("iq", { type: "get", id: "roster1" }, [
+      xml("query", { xmlns: "jabber:iq:roster" }),
+    ]);
+
+    console.log("Enviando roster request...");
+    const rosterResponse = await xmppClient.send(rosterIQ);
+
+    // Wait for the roster response
+    const rosterResult = await rosterResponse;
+    
+    // Process the roster response
+    const contacts = rosterResult.getChild("query").getChildren("item");
+    for (const contact of contacts) {
+      const jid = contact.attrs.jid;
+      console.log("Contact:", jid);
+
+      // Request presence of the contact
+      console.log("Solicitando presencia de :", jid);
+      const presenceRequest = xml("presence", { to: jid });
+      const presenceResponse = await xmppClient.send(presenceRequest);
+
+       // Get and display the presence
+      const presence = presenceResponse.getChild("show");
+      console.log("Presencia:", presence ? presence.getText() : "available");
+      console.log("-------------------------------");
+    }
+  } catch (error) {
+    console.error("Error:", error);
+  }
+}
+
+
+
+// Show user options once logged in
 function showUserOptions(xmppClient) {
   rl.question(
-    "Seleccione una opción:\n1. Enviar mensaje\n2. Eliminar mi cuenta\n3. Cerrar Sesión\n",
+    "Seleccione una opción:\n1. Enviar mensaje\n2. Eliminar mi cuenta\n3. Chatear con usuario\n4. Ver estado de usuarios conectados\n5. Cerrar Sesión\n",
     (option) => {
       if (option === "1") {
-        // Opción para enviar mensaje
+        // Option to send a message
         sendMessage(xmppClient);
       } else if (option === "2") {
-        // Opción para eliminar mi cuenta
+        // Option to delete my account
         deleteCurrentUser(xmppClient);
       } else if (option === "3") {
-        // Opción para cerrar sesión y desconectar
+        // Option to chat with a user
+        rl.question("Ingrese su contraseña: ", (password) => {
+          createChat(xmppClient, password);
+        });
+      } else if (option === "4") {
+        // Option to view connected users' status
+        getContactsPresence(xmppClient);
+      } else if (option === "5") {
+        // Option to log out and disconnect
         xmppClient.stop();
         rl.close();
       } else {
@@ -148,7 +273,7 @@ function showUserOptions(xmppClient) {
 
 
 
-// Mostrar opciones iniciales al usuario
+// Show initial options to the user
 function showInitialOptions() {
   rl.question("¿Deseas crear un usuario nuevo o entrar con uno existente? (crear/existente): ", (choice) => {
     if (choice === "crear") {
@@ -170,5 +295,5 @@ function showInitialOptions() {
   });
 }
 
-// Menu inicial
+// Initial menu
 showInitialOptions();
