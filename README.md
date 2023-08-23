@@ -29,7 +29,7 @@ npm install
 Run the application using the following command:
 
 ```bash
-npm start
+node index
 ```
 
 The application will display a menu where you can choose different options such as sending messages, chatting with other users, deleting the account, viewing the status of users, contacts, and more.
