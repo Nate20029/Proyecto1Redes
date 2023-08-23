@@ -36,11 +36,11 @@ The application will display a menu where you can choose different options such 
 
 ## Configuration
 
-Before running the application, make sure to correctly configure the XMPP server connection details in the index.js file. Modify the xmppOptions constant with the information of the server you want to use:
+Before running the application, make sure to correctly configure the XMPP server connection details in the index.js file. Modify the xmppOptions constant with the information of the server you want to use, in this case "alumchat.xyz":
 
 ```bash
 const xmppOptions = {
-  service: "tudominio.com",
+  service: "alumchat.xyz",
 };
 
 ```
