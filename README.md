@@ -24,7 +24,7 @@ npm install
 ```
 
 
-## Installation
+## RUN THE APPLICATION
 
 Run the application using the following command:
 
